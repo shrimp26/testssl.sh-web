@@ -9,15 +9,12 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   check-update:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Use a PAT if you want the push to trigger the docker.yml workflow
           # (pushes from GITHUB_TOKEN don't trigger other workflows by default)

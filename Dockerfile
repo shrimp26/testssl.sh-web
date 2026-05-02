@@ -26,7 +26,8 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 
 # ── Stage 3: Runtime ──────────────────────────────────────────────────────────
-FROM alpine:3.21 AS runtime
+# Use the same Python image as the build stage so site-packages paths match
+FROM python:3.12-alpine AS runtime
 
 # bind-tools = dig/nslookup, required by testssl.sh
 RUN apk add --no-cache \
@@ -35,7 +36,6 @@ RUN apk add --no-cache \
       bind-tools \
       openssl \
       ca-certificates \
-      python3 \
     && update-ca-certificates
 
 # Non-root user
