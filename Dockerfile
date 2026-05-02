@@ -3,16 +3,18 @@
 # ── Stage 1: Download testssl.sh ─────────────────────────────────────────────
 FROM alpine:3.21 AS testssl-dl
 
-ARG TESTSSL_VERSION=3.2
-
 RUN apk add --no-cache curl ca-certificates
 
-RUN curl -fsSL \
-      "https://github.com/drwetter/testssl.sh/archive/refs/tags/v${TESTSSL_VERSION}.tar.gz" \
-      | tar xz -C /opt \
-    && mv /opt/testssl.sh-${TESTSSL_VERSION} /opt/testssl \
+# Resolve latest release via redirect, then download the tarball
+RUN TAG=$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+            https://github.com/drwetter/testssl.sh/releases/latest \
+          | grep -oE '[^/]+$') \
+    && mkdir -p /opt/testssl \
+    && curl -fsSL \
+         "https://github.com/drwetter/testssl.sh/archive/refs/tags/${TAG}.tar.gz" \
+       | tar xz -C /opt/testssl --strip-components=1 \
     && chmod +x /opt/testssl/testssl.sh \
-    && echo "${TESTSSL_VERSION}" > /opt/testssl/VERSION
+    && echo "${TAG#v}" > /opt/testssl/VERSION
 
 
 # ── Stage 2: Python dependencies ─────────────────────────────────────────────

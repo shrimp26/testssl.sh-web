@@ -2,9 +2,7 @@ services:
   testssl-web:
     build:
       context: .
-      args:
-        TESTSSL_VERSION: ${TESTSSL_VERSION:-3.2}
-    image: testssl-web:${TESTSSL_VERSION:-latest}
+    image: testssl-web:latest
     ports:
       - "${PORT:-8000}:8000"
 
