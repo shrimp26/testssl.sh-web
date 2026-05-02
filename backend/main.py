@@ -1,9 +1,19 @@
 import asyncio
 import ipaddress
+import logging
 import os
 import re
+import shlex
+import time
 from pathlib import Path
 from typing import AsyncGenerator
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)-8s %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S%z",
+)
+logger = logging.getLogger("testssl-web")
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -100,7 +110,16 @@ class ScanRequest(BaseModel):
         return v
 
 
-async def _stream_testssl(target: str, options: list[str]) -> AsyncGenerator[str, None]:
+def _get_client_ip(request: "Request") -> str:
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+async def _stream_testssl(
+    target: str, options: list[str], client_ip: str
+) -> AsyncGenerator[str, None]:
     cmd = [
         str(TESTSSL_PATH),
         "--color", "0",
@@ -109,6 +128,9 @@ async def _stream_testssl(target: str, options: list[str]) -> AsyncGenerator[str
         *options,
         target,
     ]
+
+    logger.info("scan_start  ip=%-20s target=%s cmd=%s", client_ip, target, shlex.join(cmd))
+    t_start = time.monotonic()
 
     async with _semaphore:
         process = await asyncio.create_subprocess_exec(
@@ -128,13 +150,17 @@ async def _stream_testssl(target: str, options: list[str]) -> AsyncGenerator[str
                 if not line:
                     break
                 text = line.decode("utf-8", errors="replace").rstrip()
-                # Strip any residual ANSI escape codes
                 text = re.sub(r"\x1b\[[0-9;]*[mGKHF]", "", text)
                 yield f"data: {text}\n\n"
         finally:
             if process.returncode is None:
                 process.kill()
             await process.wait()
+            elapsed = time.monotonic() - t_start
+            logger.info(
+                "scan_end    ip=%-20s target=%s duration=%.1fs exit=%s",
+                client_ip, target, elapsed, process.returncode,
+            )
 
     yield "data: [DONE]\n\n"
 
@@ -144,8 +170,9 @@ async def _stream_testssl(target: str, options: list[str]) -> AsyncGenerator[str
 async def scan(request: Request, body: ScanRequest):
     if not TESTSSL_PATH.exists():
         raise HTTPException(status_code=503, detail="testssl.sh not found")
+    client_ip = _get_client_ip(request)
     return StreamingResponse(
-        _stream_testssl(body.target, body.options),
+        _stream_testssl(body.target, body.options, client_ip),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

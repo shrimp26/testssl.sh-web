@@ -37,6 +37,7 @@ RUN apk add --no-cache \
       openssl \
       ca-certificates \
       coreutils \
+      procps \
     && update-ca-certificates
 
 # Non-root user
