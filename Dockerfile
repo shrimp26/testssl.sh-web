@@ -36,6 +36,7 @@ RUN apk add --no-cache \
       bind-tools \
       openssl \
       ca-certificates \
+      coreutils \
     && update-ca-certificates
 
 # Non-root user
