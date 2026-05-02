@@ -511,8 +511,11 @@
         <button class="btn-icon" id="btn-copy" disabled title="Copy output">
           &#128203; Copy
         </button>
-        <button class="btn-icon" id="btn-download" disabled title="Download output">
-          &#8595; Save
+        <button class="btn-icon" id="btn-download-txt" disabled title="Download as plain text">
+          &#8595; TXT
+        </button>
+        <button class="btn-icon" id="btn-download-pdf" disabled title="Download as PDF report">
+          &#8595; PDF
         </button>
         <button class="btn-icon" id="btn-clear" title="Clear">
           &#10005; Clear
@@ -585,9 +588,10 @@
   const $btnScan      = document.getElementById('btn-scan');
   const $btnIcon      = document.getElementById('btn-icon');
   const $btnLabel     = document.getElementById('btn-label');
-  const $btnCopy      = document.getElementById('btn-copy');
-  const $btnDownload  = document.getElementById('btn-download');
-  const $btnClear     = document.getElementById('btn-clear');
+  const $btnCopy          = document.getElementById('btn-copy');
+  const $btnDownloadTxt   = document.getElementById('btn-download-txt');
+  const $btnDownloadPdf   = document.getElementById('btn-download-pdf');
+  const $btnClear         = document.getElementById('btn-clear');
   const $statusDot    = document.getElementById('status-dot');
   const $statusText   = document.getElementById('status-text');
   const $statusLines  = document.getElementById('status-lines');
@@ -689,7 +693,8 @@
     outputLines = [];
     lineCount = 0;
     $btnCopy.disabled = true;
-    $btnDownload.disabled = true;
+    $btnDownloadTxt.disabled = true;
+    $btnDownloadPdf.disabled = true;
     $statusLines.textContent = '';
   }
 
@@ -733,15 +738,283 @@
     });
   });
 
-  $btnDownload.addEventListener('click', () => {
+  $btnDownloadTxt.addEventListener('click', () => {
     const blob = new Blob([outputLines.join('\n')], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const target = $target.value.replace(/[^a-zA-Z0-9._-]/g, '_') || 'scan';
+    const tgt = $target.value.replace(/[^a-zA-Z0-9._-]/g, '_') || 'scan';
     a.href = url;
-    a.download = `testssl_${target}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+    a.download = `testssl_${tgt}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  });
+
+  // ── PDF export ────────────────────────────────────────────────────────────
+
+  function parseTestsslOutput(lines) {
+    const d = {
+      target: '', hostname: '', ip: '', port: '',
+      scanDate: '', rdns: '', service: '',
+      grade: '', scores: {},
+      protocols: [], vulns: [], cert: {},
+    };
+    for (const line of lines) {
+      let m;
+      // Target header: "Start 2024-01-15 10:30:00  -->> 1.2.3.4:443 (example.com) <<--"
+      m = line.match(/Start\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+-->>\s+([^\s:]+):(\d+)\s+\(([^)]+)\)/);
+      if (m) { d.scanDate = m[1]; d.ip = m[2]; d.port = m[3]; d.hostname = m[4]; }
+
+      m = line.match(/rDNS[^:]*:\s+(\S+)/);
+      if (m) d.rdns = m[1];
+
+      m = line.match(/Service detected:\s+(.+)/);
+      if (m) d.service = m[1].trim();
+
+      // Protocols — "TLS 1.3   offered (OK)" or "SSLv2   not offered (OK)"
+      m = line.match(/^\s+(SSLv\d+|TLS\s*1(?:\.\d)?|TLS\s*1\.3)\s+(offered|not offered)(.*)/i);
+      if (m) {
+        const name = m[1].replace(/\s+/, ' ');
+        const offered = m[2] === 'offered';
+        const deprecated = /SSLv|^TLS 1$|TLS 1\.0|TLS 1\.1/i.test(name);
+        d.protocols.push({ name, offered, deprecated, note: m[3].trim() });
+      }
+
+      // Vulnerabilities (two or more spaces between name and result)
+      if (!/Testing|Rating specs|Specification|Protocol Support|Key Exchange|Cipher Strength|Final Score|Overall Grade/i.test(line)) {
+        m = line.match(/^\s{1,6}([\w\s(),./-]{4,50?}?)\s{2,}(VULNERABLE.*|not vulnerable.*|not offered.*|potentially.*|.*\(OK\).*|.*CRITICAL.*|.*HIGH.*|.*MEDIUM.*|.*LOW.*)/i);
+        if (m) {
+          const name = m[1].trim();
+          const detail = m[2].trim();
+          if (name && name.length >= 3) {
+            let sev = 'ok';
+            if (/VULNERABLE|CRITICAL/i.test(detail)) sev = 'critical';
+            else if (/\bHIGH\b/i.test(detail)) sev = 'high';
+            else if (/\bMEDIUM\b|potentially/i.test(detail)) sev = 'medium';
+            else if (/\bLOW\b/i.test(detail)) sev = 'low';
+            d.vulns.push({ name, detail, sev });
+          }
+        }
+      }
+
+      // Rating
+      m = line.match(/Protocol Support\s*\(\d+%\)\s+(\d+)/i);   if (m) d.scores.protocol = +m[1];
+      m = line.match(/Key Exchange\s*\(\d+%\)\s+(\d+)/i);       if (m) d.scores.keyExchange = +m[1];
+      m = line.match(/Cipher Strength\s*\(\d+%\)\s+(\d+)/i);    if (m) d.scores.cipher = +m[1];
+      m = line.match(/Final Score\s+(\d+)/i);                    if (m) d.scores.final = +m[1];
+      m = line.match(/Overall Grade\s+([A-F][+-]?|T)/i);        if (m) d.grade = m[1];
+
+      // Certificate fields
+      m = line.match(/Common Name\s*\(CN\)\s+(.*)/i);            if (m) d.cert.cn = m[1].trim().replace(/"/g, '');
+      m = line.match(/subjectAltName.*\(SAN\)\s+(.*)/i);         if (m) d.cert.san = m[1].trim();
+      m = line.match(/Issuer\s+"([^"]+)"/i);                     if (m && !d.cert.issuer) d.cert.issuer = m[1];
+      m = line.match(/Server key size\s+(.*)/i);                  if (m) d.cert.keySize = m[1].trim();
+      m = line.match(/Signature Algorithm\s+(.*)/i);              if (m) d.cert.sigAlg = m[1].trim();
+      m = line.match(/Certificate Validity.*\d{4}-\d{2}-\d{2}.*-->\s*(.*)/i); if (m) d.cert.validity = m[1].trim();
+      m = line.match(/Certifi[ck]ate Expiration\s+(.*)/i);       if (m) d.cert.expiration = m[1].trim();
+      m = line.match(/OCSP stapling\s+(.*)/i);                    if (m) d.cert.ocsp = m[1].trim();
+      m = line.match(/Certificate Transparency.*\(CT\)\s+(.*)/i);if (m) d.cert.ct = m[1].trim();
+      m = line.match(/Trust \(hostname\)\s+(.*)/i);               if (m) d.cert.trust = m[1].trim();
+      m = line.match(/Chain of trust\s+(.*)/i);                   if (m) d.cert.chain = m[1].trim();
+    }
+    return d;
+  }
+
+  function gradeStyle(g) {
+    if (!g) return { bg: '#f1f5f9', fg: '#64748b', border: '#cbd5e1' };
+    const map = {
+      'A+': { bg: '#dcfce7', fg: '#15803d', border: '#86efac' },
+      'A':  { bg: '#dcfce7', fg: '#16a34a', border: '#86efac' },
+      'A-': { bg: '#dcfce7', fg: '#16a34a', border: '#86efac' },
+      'B':  { bg: '#fef9c3', fg: '#854d0e', border: '#fde047' },
+      'C':  { bg: '#ffedd5', fg: '#c2410c', border: '#fdba74' },
+      'D':  { bg: '#fee2e2', fg: '#b91c1c', border: '#fca5a5' },
+      'F':  { bg: '#fee2e2', fg: '#991b1b', border: '#fca5a5' },
+      'T':  { bg: '#ede9fe', fg: '#6d28d9', border: '#c4b5fd' },
+    };
+    return map[g] || map['C'];
+  }
+
+  function sevBadge(sev) {
+    const m = {
+      critical: 'background:#fee2e2;color:#b91c1c',
+      high:     'background:#ffedd5;color:#c2410c',
+      medium:   'background:#fef9c3;color:#854d0e',
+      low:      'background:#e0f2fe;color:#0369a1',
+      ok:       'background:#dcfce7;color:#15803d',
+    };
+    const labels = { critical:'VULNERABLE', high:'HIGH', medium:'MEDIUM', low:'LOW', ok:'OK' };
+    const s = m[sev] || m.ok;
+    return `<span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;${s}">${labels[sev]||'OK'}</span>`;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function colorizeForPrint(line) {
+    const e = esc(line);
+    if (/\bVULNERABLE\b|\bCRITICAL\b/i.test(line)) return `<span style="color:#dc2626">${e}</span>`;
+    if (/\bHIGH\b.*severity/i.test(line))           return `<span style="color:#ea580c">${e}</span>`;
+    if (/\bMEDIUM\b.*severity/i.test(line))         return `<span style="color:#d97706">${e}</span>`;
+    if (/\bOK\b|not vulnerable/i.test(line))        return `<span style="color:#16a34a">${e}</span>`;
+    if (/^\s{0,4}(Testing |Start |Done |Finished )/i.test(line)) return `<span style="color:#60a5fa;font-weight:600">${e}</span>`;
+    if (/^[=-]{4,}/.test(line.trim()))              return `<span style="color:#475569">${e}</span>`;
+    return `<span style="color:#cbd5e1">${e}</span>`;
+  }
+
+  function generateReportHTML(lines) {
+    const d = parseTestsslOutput(lines);
+    const gs = gradeStyle(d.grade);
+    const slug = (d.hostname || $target.value).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    const protoRows = d.protocols.map(p => {
+      const color = !p.offered ? '#64748b' : p.deprecated ? '#dc2626' : '#16a34a';
+      const badge = !p.offered
+        ? `<span style="background:#f1f5f9;color:#64748b;display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">Not offered</span>`
+        : p.deprecated
+          ? `<span style="background:#fee2e2;color:#b91c1c;display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">Offered ⚠</span>`
+          : `<span style="background:#dcfce7;color:#15803d;display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600">Offered</span>`;
+      return `<tr><td style="font-weight:500;color:${color}">${esc(p.name)}</td><td>${badge}</td><td style="color:#64748b;font-size:12px">${esc(p.note)}</td></tr>`;
+    }).join('');
+
+    const vulnRows = d.vulns.map(v =>
+      `<tr><td style="font-weight:500">${esc(v.name)}</td><td>${sevBadge(v.sev)}</td><td style="font-size:12px;color:#475569">${esc(v.detail)}</td></tr>`
+    ).join('');
+
+    const certRows = Object.entries({
+      'Common Name': d.cert.cn, 'SANs': d.cert.san, 'Issuer': d.cert.issuer,
+      'Key Size': d.cert.keySize, 'Signature': d.cert.sigAlg,
+      'Validity': d.cert.validity, 'Expiration': d.cert.expiration,
+      'OCSP Stapling': d.cert.ocsp, 'Transparency (CT)': d.cert.ct,
+      'Trust': d.cert.trust, 'Chain': d.cert.chain,
+    }).filter(([, v]) => v).map(([k, v]) =>
+      `<tr><td style="font-weight:500;color:#475569;width:160px">${esc(k)}</td><td>${esc(v)}</td></tr>`
+    ).join('');
+
+    const scoresBlock = Object.keys(d.scores).length ? `
+      <div style="margin-top:12px;font-size:13px;line-height:2">
+        ${d.scores.protocol    !== undefined ? `<div><span style="color:#6b7280">Protocol Support (30%)</span>&nbsp;&nbsp;<strong>${d.scores.protocol}</strong></div>` : ''}
+        ${d.scores.keyExchange !== undefined ? `<div><span style="color:#6b7280">Key Exchange (30%)</span>&nbsp;&nbsp;<strong>${d.scores.keyExchange}</strong></div>` : ''}
+        ${d.scores.cipher      !== undefined ? `<div><span style="color:#6b7280">Cipher Strength (40%)</span>&nbsp;&nbsp;<strong>${d.scores.cipher}</strong></div>` : ''}
+        ${d.scores.final       !== undefined ? `<div style="border-top:1px solid #e2e8f0;margin-top:4px;padding-top:4px"><span style="color:#6b7280">Final Score</span>&nbsp;&nbsp;<strong style="font-size:15px">${d.scores.final}</strong></div>` : ''}
+      </div>` : '<div style="color:#94a3b8;font-size:13px;margin-top:12px">Run with <code>--full</code> to get a rating.</div>';
+
+    const rawHtml = lines.map(l => colorizeForPrint(l)).join('\n');
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>testssl.sh Report — ${esc(d.hostname || slug)}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background: #f8fafc; color: #1e293b; font-size: 14px; }
+  .page { max-width: 960px; margin: 0 auto; padding: 0 32px 48px; }
+  .header { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); color: white; padding: 28px 32px; margin-bottom: 32px; }
+  .header-title { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-sub { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .summary { display: grid; grid-template-columns: 140px 1fr 1fr; gap: 20px; margin-bottom: 32px; align-items: start; }
+  .grade-box { border-radius: 14px; border: 2px solid ${gs.border}; background: ${gs.bg}; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px 8px; aspect-ratio: 1; }
+  .grade-letter { font-size: 64px; font-weight: 900; color: ${gs.fg}; line-height: 1; }
+  .grade-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: ${gs.fg}; opacity: 0.7; margin-top: 4px; }
+  .info-box { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 20px; }
+  .info-box h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 0.7px; color: #94a3b8; margin-bottom: 10px; font-weight: 600; }
+  .info-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .info-label { color: #64748b; min-width: 90px; font-weight: 500; flex-shrink: 0; }
+  .section { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
+  .section h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: #3b82f6; padding-bottom: 10px; margin-bottom: 14px; border-bottom: 2px solid #dbeafe; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #f8fafc; text-align: left; padding: 8px 12px; font-weight: 600; color: #64748b; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .raw { background: #0f172a; border-radius: 10px; padding: 20px; font-family: ui-monospace, "Cascadia Code", "Fira Mono", Consolas, monospace; font-size: 11.5px; line-height: 1.65; white-space: pre-wrap; word-break: break-all; }
+  .footer { text-align: center; font-size: 11px; color: #94a3b8; padding: 20px 0; border-top: 1px solid #e2e8f0; margin-top: 32px; }
+  @media print {
+    body { background: white; }
+    .page { padding: 0 24px 32px; }
+    .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .grade-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    span[style] { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .raw { -webkit-print-color-adjust: exact; print-color-adjust: exact; page-break-inside: avoid; }
+    .section { page-break-inside: avoid; border: 1px solid #e2e8f0 !important; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="page" style="padding-top:0;padding-bottom:0">
+    <div class="header-title">&#128274; testssl.sh — TLS Scan Report</div>
+    <div class="header-sub">Generated ${esc(now)} &nbsp;·&nbsp; testssl.sh-web</div>
+  </div>
+</div>
+<div class="page">
+
+  <div class="summary">
+    <div class="grade-box">
+      <div class="grade-letter">${d.grade || '?'}</div>
+      <div class="grade-label">Overall Grade</div>
+    </div>
+    <div class="info-box">
+      <h3>Target</h3>
+      ${d.hostname ? `<div class="info-row"><span class="info-label">Hostname</span><strong>${esc(d.hostname)}</strong></div>` : ''}
+      ${d.ip       ? `<div class="info-row"><span class="info-label">IP Address</span>${esc(d.ip)}</div>` : ''}
+      ${d.port     ? `<div class="info-row"><span class="info-label">Port</span>${esc(d.port)}</div>` : ''}
+      ${d.rdns     ? `<div class="info-row"><span class="info-label">rDNS</span>${esc(d.rdns)}</div>` : ''}
+      ${d.service  ? `<div class="info-row"><span class="info-label">Service</span>${esc(d.service)}</div>` : ''}
+      ${d.scanDate ? `<div class="info-row"><span class="info-label">Scanned</span>${esc(d.scanDate)}</div>` : ''}
+    </div>
+    <div class="info-box">
+      <h3>Score Breakdown</h3>
+      ${scoresBlock}
+    </div>
+  </div>
+
+  ${certRows ? `
+  <div class="section">
+    <h2>Certificate</h2>
+    <table>
+      <colgroup><col style="width:160px"><col></colgroup>
+      <tbody>${certRows}</tbody>
+    </table>
+  </div>` : ''}
+
+  ${protoRows ? `
+  <div class="section">
+    <h2>Protocol Support</h2>
+    <table>
+      <thead><tr><th>Protocol</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody>${protoRows}</tbody>
+    </table>
+  </div>` : ''}
+
+  ${vulnRows ? `
+  <div class="section">
+    <h2>Vulnerabilities</h2>
+    <table>
+      <thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead>
+      <tbody>${vulnRows}</tbody>
+    </table>
+  </div>` : ''}
+
+  <div class="section">
+    <h2>Raw Output</h2>
+    <div class="raw">${rawHtml}</div>
+  </div>
+
+  <div class="footer">testssl.sh-web &nbsp;·&nbsp; ${esc(d.hostname || '')} &nbsp;·&nbsp; ${esc(now)}</div>
+</div>
+<script>window.onload = () => window.print();<\/script>
+</body>
+</html>`;
+  }
+
+  $btnDownloadPdf.addEventListener('click', () => {
+    const html = generateReportHTML(outputLines);
+    const win = window.open('', '_blank');
+    if (!win) { alert('Autorisez les popups pour générer le PDF.'); return; }
+    win.document.write(html);
+    win.document.close();
   });
 
   $btnClear.addEventListener('click', () => {
@@ -778,7 +1051,8 @@
     $btnLabel.textContent = 'Stop';
     $btnScan.classList.add('scanning');
     $btnCopy.disabled = true;
-    $btnDownload.disabled = true;
+    $btnDownloadTxt.disabled = true;
+    $btnDownloadPdf.disabled = true;
 
     const startTime = Date.now();
 
@@ -842,8 +1116,10 @@
       $btnIcon.textContent = '▶';
       $btnLabel.textContent = 'Start Scan';
       $btnScan.classList.remove('scanning');
-      $btnCopy.disabled = outputLines.length === 0;
-      $btnDownload.disabled = outputLines.length === 0;
+      const hasOutput = outputLines.length > 0;
+      $btnCopy.disabled = !hasOutput;
+      $btnDownloadTxt.disabled = !hasOutput;
+      $btnDownloadPdf.disabled = !hasOutput;
     }
   }
 
