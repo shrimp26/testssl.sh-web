@@ -1,0 +1,42 @@
+services:
+  testssl-web:
+    build:
+      context: .
+      args:
+        TESTSSL_VERSION: ${TESTSSL_VERSION:-3.2}
+    image: testssl-web:${TESTSSL_VERSION:-latest}
+    ports:
+      - "${PORT:-8000}:8000"
+
+    # ── Hardening ─────────────────────────────────────────────────────────────
+    security_opt:
+      - no-new-privileges:true
+      # Restrict syscalls to what the app actually needs
+      - seccomp:docker/seccomp.json
+
+    # Read-only root filesystem; writable scratch space via tmpfs
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=128m,uid=1000,gid=1000
+
+    # Drop ALL Linux capabilities — testssl.sh + python need none
+    cap_drop:
+      - ALL
+
+    # Explicit user (matches Dockerfile USER)
+    user: "1000:1000"
+
+    # Resource limits to prevent DoS
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 512M
+
+    restart: unless-stopped
+
+    environment:
+      TESTSSL_PATH: /opt/testssl/testssl.sh
+      MAX_CONCURRENT_SCANS: "${MAX_CONCURRENT_SCANS:-3}"
+      SCAN_TIMEOUT: "${SCAN_TIMEOUT:-600}"
+      RATE_LIMIT: "${RATE_LIMIT:-10/minute}"

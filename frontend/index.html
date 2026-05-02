@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>testssl.sh Web</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #1c2128;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --blue: #58a6ff;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+      --teal: #39d353;
+      --accent: #238636;
+      --accent-hover: #2ea043;
+      --danger: #da3633;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #238636, #2ea043);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .logo-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-title span {
+      color: var(--green);
+    }
+
+    .header-badge {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text-dim);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
+    }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      grid-template-rows: 1fr;
+      gap: 0;
+      overflow: hidden;
+      height: calc(100vh - 56px);
+    }
+
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    input[type="text"], select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 14px;
+      font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
+      width: 100%;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+
+    input[type="text"]:focus, select:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+    }
+
+    input[type="text"]::placeholder {
+      color: var(--text-dim);
+    }
+
+    .input-hint {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .mode-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text-dim);
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .mode-btn:hover { border-color: var(--blue); color: var(--text); }
+    .mode-btn.active {
+      background: rgba(88, 166, 255, 0.1);
+      border-color: var(--blue);
+      color: var(--blue);
+    }
+
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .option-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .option-check:hover { background: var(--surface2); }
+
+    .option-check input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--blue);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .option-check .opt-label { font-size: 12px; color: var(--text); }
+    .option-check .opt-flag {
+      margin-left: auto;
+      font-size: 10px;
+      color: var(--text-dim);
+      font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+    }
+
+    .btn-scan {
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      color: #fff;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-scan:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-scan:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-scan.scanning {
+      background: var(--danger);
+      border-color: var(--danger);
+    }
+
+    .btn-scan.scanning:hover:not(:disabled) {
+      background: #b22a28;
+    }
+
+    .terminal-wrap {
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .terminal-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .dot-red   { background: #ff5f57; }
+    .dot-yellow{ background: #febc2e; }
+    .dot-green { background: #28c840; }
+
+    .terminal-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
+      flex: 1;
+      text-align: center;
+    }
+
+    .terminal-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-dim);
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .btn-icon:hover { border-color: var(--blue); color: var(--text); }
+    .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #terminal {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
+      font-size: 13px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .placeholder {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 40px;
+    }
+
+    .placeholder-icon {
+      font-size: 48px;
+      opacity: 0.3;
+    }
+
+    .placeholder h2 {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text-dim);
+    }
+
+    .placeholder p {
+      font-size: 13px;
+      max-width: 320px;
+      line-height: 1.6;
+    }
+
+    /* Terminal output coloring */
+    .line-vuln     { color: var(--red); }
+    .line-ok       { color: var(--green); }
+    .line-medium   { color: var(--yellow); }
+    .line-low      { color: var(--orange); }
+    .line-info     { color: var(--blue); }
+    .line-section  { color: var(--purple); font-weight: 600; }
+    .line-header   { color: var(--teal); font-weight: 600; }
+    .line-dim      { color: var(--text-dim); }
+    .line-error    { color: var(--red); background: rgba(248, 81, 73, 0.1); padding: 0 4px; border-radius: 3px; }
+
+    /* Status bar */
+    .status-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 6px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 11px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      display: inline-block;
+    }
+    .status-dot.running {
+      background: var(--yellow);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .status-dot.done    { background: var(--green); }
+    .status-dot.error   { background: var(--red); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    .status-text { font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace; }
+    .status-right { margin-left: auto; }
+
+    /* Scrollbar styling */
+    #terminal::-webkit-scrollbar { width: 8px; }
+    #terminal::-webkit-scrollbar-track { background: transparent; }
+    #terminal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    #terminal::-webkit-scrollbar-thumb:hover { background: #484f58; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        min-height: calc(100vh - 56px);
+      }
+
+      .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: none;
+      }
+
+      .terminal-wrap {
+        height: 60vh;
+        min-height: 400px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">&#128274;</div>
+    <span class="logo-title">testssl<span>.sh</span> web</span>
+  </div>
+  <span class="header-badge" id="version-badge">loading...</span>
+</header>
+
+<main>
+  <!-- Sidebar / Config panel -->
+  <aside class="sidebar">
+
+    <div>
+      <div class="panel-title">Target</div>
+      <div class="field">
+        <label for="target">Hostname or IP</label>
+        <input type="text" id="target" placeholder="example.com or example.com:8443" autocomplete="off" autocorrect="off" spellcheck="false" />
+        <span class="input-hint">Supports hostname, IPv4/IPv6. Append :port if needed (default 443).</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel-title">Scan Mode</div>
+      <div class="mode-grid">
+        <div class="mode-btn active" data-mode="quick">
+          &#9889; Quick
+        </div>
+        <div class="mode-btn" data-mode="full">
+          &#128269; Full
+        </div>
+        <div class="mode-btn" data-mode="vulns">
+          &#128737; Vulns only
+        </div>
+        <div class="mode-btn" data-mode="protocols">
+          &#128260; Protocols
+        </div>
+      </div>
+    </div>
+
+    <div id="custom-options" style="display:none">
+      <div class="panel-title">Custom Options</div>
+      <div class="options-grid" id="options-list"></div>
+    </div>
+
+    <div>
+      <div class="panel-title">Flags</div>
+      <div class="options-grid">
+        <label class="option-check">
+          <input type="checkbox" id="opt-sneaky" />
+          <span class="opt-label">Sneaky mode</span>
+          <span class="opt-flag">--sneaky</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="btn-scan" id="btn-scan">
+      <span id="btn-icon">&#9654;</span>
+      <span id="btn-label">Start Scan</span>
+    </button>
+
+  </aside>
+
+  <!-- Terminal output -->
+  <div class="terminal-wrap">
+    <div class="terminal-bar">
+      <div class="terminal-dots">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-yellow"></div>
+        <div class="dot dot-green"></div>
+      </div>
+      <span class="terminal-label" id="terminal-label">— ready —</span>
+      <div class="terminal-actions">
+        <button class="btn-icon" id="btn-copy" disabled title="Copy output">
+          &#128203; Copy
+        </button>
+        <button class="btn-icon" id="btn-download" disabled title="Download output">
+          &#8595; Save
+        </button>
+        <button class="btn-icon" id="btn-clear" title="Clear">
+          &#10005; Clear
+        </button>
+      </div>
+    </div>
+
+    <div id="terminal">
+      <div class="placeholder" id="placeholder">
+        <div class="placeholder-icon">&#128274;</div>
+        <h2>TLS/SSL Scanner</h2>
+        <p>Enter a target hostname and click <strong>Start Scan</strong> to analyse the TLS configuration and check for vulnerabilities.</p>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span class="status-dot" id="status-dot"></span>
+      <span class="status-text" id="status-text">Idle</span>
+      <span class="status-right" id="status-lines"></span>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Scan mode definitions ──────────────────────────────────────────────────
+  const MODES = {
+    quick:     { label: 'Quick scan',     options: ['-p', '-S', '-P', '--header'] },
+    full:      { label: 'Full scan',      options: ['--full'] },
+    vulns:     { label: 'Vulnerabilities',options: ['--vulnerable'] },
+    protocols: { label: 'Protocols',      options: ['--protocols', '--cipher-per-proto'] },
+    custom:    { label: 'Custom scan',    options: [] },
+  };
+
+  const CUSTOM_OPTIONS = [
+    { flag: '--protocols',       label: 'Protocols' },
+    { flag: '--server-defaults', label: 'Server defaults' },
+    { flag: '--server-preference', label: 'Server preference' },
+    { flag: '--cipher-per-proto',label: 'Ciphers per protocol' },
+    { flag: '--header',          label: 'HTTP headers' },
+    { flag: '--pfs',             label: 'Perfect Forward Secrecy' },
+    { flag: '--heartbleed',      label: 'Heartbleed' },
+    { flag: '--ccs-injection',   label: 'CCS Injection' },
+    { flag: '--ticketbleed',     label: 'Ticketbleed' },
+    { flag: '--robot',           label: 'ROBOT' },
+    { flag: '--lucky13',         label: 'Lucky13' },
+    { flag: '--drown',           label: 'DROWN' },
+    { flag: '--logjam',          label: 'Logjam' },
+    { flag: '--beast',           label: 'BEAST' },
+    { flag: '--crime',           label: 'CRIME' },
+    { flag: '--poodle',          label: 'POODLE' },
+    { flag: '--freak',           label: 'FREAK' },
+    { flag: '--rc4',             label: 'RC4' },
+  ];
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let currentMode = 'quick';
+  let scanning = false;
+  let abortController = null;
+  let outputLines = [];
+  let lineCount = 0;
+  let autoScroll = true;
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const $target       = document.getElementById('target');
+  const $terminal     = document.getElementById('terminal');
+  const $placeholder  = document.getElementById('placeholder');
+  const $btnScan      = document.getElementById('btn-scan');
+  const $btnIcon      = document.getElementById('btn-icon');
+  const $btnLabel     = document.getElementById('btn-label');
+  const $btnCopy      = document.getElementById('btn-copy');
+  const $btnDownload  = document.getElementById('btn-download');
+  const $btnClear     = document.getElementById('btn-clear');
+  const $statusDot    = document.getElementById('status-dot');
+  const $statusText   = document.getElementById('status-text');
+  const $statusLines  = document.getElementById('status-lines');
+  const $termLabel    = document.getElementById('terminal-label');
+  const $versionBadge = document.getElementById('version-badge');
+  const $optSneaky    = document.getElementById('opt-sneaky');
+  const $customOpts   = document.getElementById('custom-options');
+  const $optsList     = document.getElementById('options-list');
+
+  // ── Build custom options checkboxes ───────────────────────────────────────
+  CUSTOM_OPTIONS.forEach(({ flag, label }) => {
+    const el = document.createElement('label');
+    el.className = 'option-check';
+    el.innerHTML = `
+      <input type="checkbox" data-flag="${flag}" />
+      <span class="opt-label">${label}</span>
+      <span class="opt-flag">${flag}</span>
+    `;
+    $optsList.appendChild(el);
+  });
+
+  // ── Mode buttons ──────────────────────────────────────────────────────────
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMode = btn.dataset.mode;
+      $customOpts.style.display = currentMode === 'custom' ? 'block' : 'none';
+    });
+  });
+
+  // ── Version badge ─────────────────────────────────────────────────────────
+  fetch('/api/version')
+    .then(r => r.json())
+    .then(d => { $versionBadge.textContent = `testssl.sh v${d.testssl_version}`; })
+    .catch(() => { $versionBadge.textContent = 'testssl.sh'; });
+
+  // ── Colorize output line ──────────────────────────────────────────────────
+  function escape(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function colorize(line) {
+    const esc = escape(line);
+    if (!line.trim()) return `<span class="line-dim">${esc}</span>`;
+
+    // Fatal/error
+    if (/\[ERROR\]|\[FATAL\]|\[CRITICAL\]|\bFATAL\b/.test(line))
+      return `<span class="line-error">${esc}</span>`;
+
+    // Vulnerable
+    if (/\bVULNERABLE\b|\bCRITICAL\b/.test(line))
+      return `<span class="line-vuln">${esc}</span>`;
+
+    // HIGH severity
+    if (/\bHIGH\b/.test(line) && /severity/i.test(line))
+      return `<span class="line-vuln">${esc}</span>`;
+
+    // Medium
+    if (/\bMEDIUM\b/.test(line) && /severity/i.test(line))
+      return `<span class="line-medium">${esc}</span>`;
+
+    // Low
+    if (/\bLOW\b/.test(line) && /severity/i.test(line))
+      return `<span class="line-low">${esc}</span>`;
+
+    // OK / not vulnerable / not offered
+    if (/\bOK\b|\bnot vulnerable\b|\bNot vulnerable\b/.test(line))
+      return `<span class="line-ok">${esc}</span>`;
+
+    // Section headers (lines with lots of dashes or equal signs)
+    if (/^[-=]{4,}/.test(line.trim()))
+      return `<span class="line-dim">${esc}</span>`;
+
+    // Test category headers ("Testing ...")
+    if (/^\s{0,4}(Testing |Start |Done |Finished )/.test(line))
+      return `<span class="line-header">${esc}</span>`;
+
+    // IP / target info lines
+    if (/^\s*(IP|Hostname|Port|Service|rDNS)\s+/.test(line))
+      return `<span class="line-info">${esc}</span>`;
+
+    // offered / supported
+    if (/\boffered\b|\bsupported\b/.test(line))
+      return `<span class="line-section">${esc}</span>`;
+
+    // Deprecated / deprecated
+    if (/\bdeprecated\b|\bweak\b|\binsecure\b/i.test(line))
+      return `<span class="line-medium">${esc}</span>`;
+
+    return `<span>${esc}</span>`;
+  }
+
+  // ── Terminal helpers ───────────────────────────────────────────────────────
+  function clearTerminal() {
+    $terminal.innerHTML = '';
+    $terminal.appendChild($placeholder);
+    $placeholder.style.display = 'flex';
+    outputLines = [];
+    lineCount = 0;
+    $btnCopy.disabled = true;
+    $btnDownload.disabled = true;
+    $statusLines.textContent = '';
+  }
+
+  function appendLine(text) {
+    if ($placeholder.style.display !== 'none') {
+      $placeholder.style.display = 'none';
+    }
+
+    outputLines.push(text);
+    lineCount++;
+
+    const span = document.createElement('span');
+    span.className = 'output-line';
+    span.innerHTML = colorize(text) + '\n';
+    $terminal.appendChild(span);
+
+    if (autoScroll) {
+      $terminal.scrollTop = $terminal.scrollHeight;
+    }
+
+    $statusLines.textContent = `${lineCount} lines`;
+  }
+
+  $terminal.addEventListener('scroll', () => {
+    const atBottom = $terminal.scrollHeight - $terminal.scrollTop - $terminal.clientHeight < 40;
+    autoScroll = atBottom;
+  });
+
+  // ── Status helpers ─────────────────────────────────────────────────────────
+  function setStatus(state, text) {
+    $statusDot.className = 'status-dot ' + state;
+    $statusText.textContent = text;
+  }
+
+  // ── Copy & Download ────────────────────────────────────────────────────────
+  $btnCopy.addEventListener('click', () => {
+    navigator.clipboard.writeText(outputLines.join('\n')).then(() => {
+      const orig = $btnCopy.innerHTML;
+      $btnCopy.innerHTML = '&#10003; Copied';
+      setTimeout(() => { $btnCopy.innerHTML = orig; }, 1500);
+    });
+  });
+
+  $btnDownload.addEventListener('click', () => {
+    const blob = new Blob([outputLines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const target = $target.value.replace(/[^a-zA-Z0-9._-]/g, '_') || 'scan';
+    a.href = url;
+    a.download = `testssl_${target}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  $btnClear.addEventListener('click', () => {
+    if (!scanning) clearTerminal();
+  });
+
+  // ── Scan logic ────────────────────────────────────────────────────────────
+  async function startScan() {
+    const target = $target.value.trim();
+    if (!target) {
+      $target.focus();
+      return;
+    }
+
+    // Build options list
+    let options = [...MODES[currentMode].options];
+    if (currentMode === 'custom') {
+      options = [];
+      document.querySelectorAll('#options-list input[type=checkbox]:checked').forEach(cb => {
+        options.push(cb.dataset.flag);
+      });
+    }
+    if ($optSneaky.checked) options.push('--sneaky');
+
+    // Switch to scanning state
+    scanning = true;
+    autoScroll = true;
+    abortController = new AbortController();
+
+    clearTerminal();
+    setStatus('running', `Scanning ${target}…`);
+    $termLabel.textContent = target;
+    $btnIcon.textContent = '⏹';
+    $btnLabel.textContent = 'Stop';
+    $btnScan.classList.add('scanning');
+    $btnCopy.disabled = true;
+    $btnDownload.disabled = true;
+
+    const startTime = Date.now();
+
+    try {
+      const response = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target, options }),
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: response.statusText }));
+        throw new Error(err.detail || response.statusText);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop(); // keep incomplete chunk
+
+        for (const chunk of parts) {
+          for (const raw of chunk.split('\n')) {
+            if (raw.startsWith('data: ')) {
+              const line = raw.slice(6);
+              if (line === '[DONE]') continue;
+              appendLine(line);
+            }
+          }
+        }
+      }
+
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      appendLine('');
+      appendLine(`── Scan completed in ${elapsed}s ──`);
+      setStatus('done', `Done in ${elapsed}s`);
+      $termLabel.textContent = `${target} — done`;
+
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        appendLine('');
+        appendLine('[ABORTED] Scan cancelled by user.');
+        setStatus('', 'Cancelled');
+        $termLabel.textContent = `${target} — cancelled`;
+      } else {
+        appendLine('');
+        appendLine(`[ERROR] ${err.message}`);
+        setStatus('error', `Error: ${err.message}`);
+        $termLabel.textContent = `${target} — error`;
+      }
+    } finally {
+      scanning = false;
+      abortController = null;
+      $btnIcon.textContent = '▶';
+      $btnLabel.textContent = 'Start Scan';
+      $btnScan.classList.remove('scanning');
+      $btnCopy.disabled = outputLines.length === 0;
+      $btnDownload.disabled = outputLines.length === 0;
+    }
+  }
+
+  function stopScan() {
+    if (abortController) abortController.abort();
+  }
+
+  $btnScan.addEventListener('click', () => {
+    if (scanning) stopScan();
+    else startScan();
+  });
+
+  $target.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !scanning) startScan();
+  });
+
+})();
+</script>
+</body>
+</html>
